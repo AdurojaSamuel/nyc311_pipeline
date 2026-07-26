@@ -1,0 +1,10 @@
+| Area | Decision |
+|---|---|
+| API access | Use `https://data.cityofnewyork.us/api/v3/views/erm2-nwe9/query.json` with POST and `X-App-Token`; SODA3 requests must be authenticated or marked with an app token, and POST is recommended for longer/clearer query payloads.【5014†】【5010†】 |
+| Pagination | Use SODA3 `page: {pageNumber, pageSize}`. Page numbers are 1-indexed; Socrata warns that high page numbers degrade drastically, so the full load is split by day instead of paginating one global result set.【5014†】【5022†】 |
+| Primary key | `unique_key` is the dataset row identifier and is described as the unique Service Request identifier; the data dictionary says each row has a different Unique Key, but it is not the customer-facing SR number.【5000†】【5002†】 |
+| Incremental field | Use `created_date` for **new-row ingestion** because it is the Service Request creation timestamp; use `unique_key` as a tie-breaker for records with the same timestamp.【5000†】【5002†】 |
+| Mutable-row caveat | NYC says the dataset is updated daily and field values can change over time; `resolution_action_updated_date` captures when the responding agency last updated a service request. So a strict new-row cursor is efficient, but a periodic rolling refresh is recommended if you need corrections/closures on older requests.【5001†】【5002†】 |
+| Timestamp handling | `created_date` is a Socrata `floating_timestamp`, meaning no timezone offset is embedded; Socrata supports comparison operators such as `>`, `>=`, `<`, `<=` on floating timestamps.【5029†】 |
+| Local storage | Use Parquet because it is columnar and efficient for analysis; PyArrow supports partitioned datasets, compression, row group sizing, and append-style workflows.【5045†】【5046†】 |
+| Query engine | Use DuckDB for validation/merging because it can scan Parquet files/globs, push down filters/projections, and read multiple files as one table.【5049†】 |
