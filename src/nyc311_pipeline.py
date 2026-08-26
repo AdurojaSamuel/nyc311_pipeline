@@ -18,8 +18,10 @@ DATASET_ID = "erm2-nwe9"
 API_URL = os.getenv("NYC311_API_URL")
 APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
 ROOT = Path(os.getenv("NYC311_ROOT"))
-STAGING = ROOT / "data" / "staging"
-CURATED = ROOT / "data" / "curated"
+DATA_ROOT = Path(os.getenv("NYC311_DATA_ROOT", ROOT / "data"))
+
+STAGING = DATA_ROOT / "staging"
+CURATED = DATA_ROOT / "curated"
 META = ROOT / "metadata"
 RUNS = META / "runs"
 LOGS = ROOT / "logs"
