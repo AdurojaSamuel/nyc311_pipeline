@@ -15,16 +15,16 @@ from urllib3.util.retry import Retry
 load_dotenv()
 
 DATASET_ID = "erm2-nwe9"
-API_URL = os.getenv("NYC311_API_URL", "https://data.cityofnewyork.us/api/v3/views/erm2-nwe9/query.json")
-APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", "")
-ROOT = Path(os.getenv("NYC311_ROOT", "/home/samuel/Documents/nyc311_pipeline"))
+API_URL = os.getenv("NYC311_API_URL")
+APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
+ROOT = Path(os.getenv("NYC311_ROOT"))
 STAGING = ROOT / "data" / "staging"
 CURATED = ROOT / "data" / "curated"
 META = ROOT / "metadata"
 RUNS = META / "runs"
 LOGS = ROOT / "logs"
-PAGE_SIZE = int(os.getenv("PAGE_SIZE", "25000"))
-TIMEOUT = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "600"))
+PAGE_SIZE = int(os.getenv("PAGE_SIZE"))
+TIMEOUT = int(os.getenv("REQUEST_TIMEOUT_SECONDS"))
 KEEP_STAGING = os.getenv("KEEP_STAGING", "0") == "1"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 

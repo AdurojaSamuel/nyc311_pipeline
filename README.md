@@ -1,10 +1,463 @@
-| Area | Decision |
-|---|---|
-| API access | Use `https://data.cityofnewyork.us/api/v3/views/erm2-nwe9/query.json` with POST and `X-App-Token`; SODA3 requests must be authenticated or marked with an app token, and POST is recommended for longer/clearer query payloads.【5014†】【5010†】 |
-| Pagination | Use SODA3 `page: {pageNumber, pageSize}`. Page numbers are 1-indexed; Socrata warns that high page numbers degrade drastically, so the full load is split by day instead of paginating one global result set.【5014†】【5022†】 |
-| Primary key | `unique_key` is the dataset row identifier and is described as the unique Service Request identifier; the data dictionary says each row has a different Unique Key, but it is not the customer-facing SR number.【5000†】【5002†】 |
-| Incremental field | Use `created_date` for **new-row ingestion** because it is the Service Request creation timestamp; use `unique_key` as a tie-breaker for records with the same timestamp.【5000†】【5002†】 |
-| Mutable-row caveat | NYC says the dataset is updated daily and field values can change over time; `resolution_action_updated_date` captures when the responding agency last updated a service request. So a strict new-row cursor is efficient, but a periodic rolling refresh is recommended if you need corrections/closures on older requests.【5001†】【5002†】 |
-| Timestamp handling | `created_date` is a Socrata `floating_timestamp`, meaning no timezone offset is embedded; Socrata supports comparison operators such as `>`, `>=`, `<`, `<=` on floating timestamps.【5029†】 |
-| Local storage | Use Parquet because it is columnar and efficient for analysis; PyArrow supports partitioned datasets, compression, row group sizing, and append-style workflows.【5045†】【5046†】 |
-| Query engine | Use DuckDB for validation/merging because it can scan Parquet files/globs, push down filters/projections, and read multiple files as one table.【5049†】 |
+# NYC 311 Call Center Analytics & Workforce Optimization Platform
+
+### Research / Prototype Project
+
+---
+
+## 1. Project Overview
+
+This project is a research and prototype initiative focused on building an end-to-end analytics, forecasting, optimization, and visualization platform using the **NYC 311 Service Requests dataset**.
+
+The objective is to investigate how modern data engineering, time-series forecasting, machine learning, workforce optimization, and business intelligence techniques can be combined to improve call center operations and workforce planning.
+
+The project runs on **Linux** and uses a locally managed **Parquet-based Data Lake** as the primary storage layer.
+
+---
+
+## 2. Research Objectives
+
+The project seeks to answer the following questions:
+
+### Forecasting
+
+Can historical NYC 311 call/service request data be used to accurately forecast future daily call volumes?
+
+### Workforce Optimization
+
+Given a forecasted call volume:
+
+- How many agents are required each day?
+- How many agents are required each month?
+- How should staffing levels be adjusted to maintain service levels?
+- How can staffing costs be minimized while maintaining operational targets?
+
+### Operational Analytics
+
+How can call center managers monitor performance using modern dashboards and KPI visualizations?
+
+---
+
+# 3. High-Level Architecture
+
+```text
++-------------------------+
+| NYC Open Data API       |
+| NYC 311 Dataset         |
++-----------+-------------+
+            |
+            v
++-------------------------+
+| Python Data Pipeline    |
+| Linux                   |
++-----------+-------------+
+            |
+            v
++-------------------------+
+| Parquet Data Lake       |
+| Local Storage           |
++-----------+-------------+
+            |
+            +----------------------+
+            |                      |
+            v                      v
++------------------+    +------------------+
+| Forecast Models  |    | KPI Analytics    |
+| ARIMA            |    | Power BI         |
+| Holt-Winters     |    | Dashboards       |
+| LSTM             |    +------------------+
++---------+--------+
+          |
+          v
++-------------------------+
+| Workforce Optimization  |
+| Staffing Recommendation |
++-----------+-------------+
+            |
+            +----------------------+
+            |                      |
+            v                      v
++------------------+    +------------------+
+| R Shiny App      |    | Python Dash App  |
++------------------+    +------------------+
+```
+
+---
+
+# 4. Project Phases
+
+The project is organized into four sequential phases.
+
+---
+
+## Phase 1 — Data Engineering
+
+### Objective
+
+Build a robust Linux-based data pipeline capable of:
+
+- Performing the initial historical load of NYC 311 data.
+- Storing data efficiently in Parquet format.
+- Maintaining a local analytical data lake.
+- Performing daily incremental updates.
+- Supporting future analytical workloads.
+
+### Technology
+
+- Python
+- Requests
+- Pandas
+- PyArrow
+- DuckDB
+- Linux Cron/Systemd
+
+### Deliverables
+
+- Historical data extraction
+- Incremental ingestion process
+- Metadata tracking
+- Data validation
+- Data quality monitoring
+
+---
+
+## Phase 2 — Forecasting Engine
+
+### Objective
+
+Forecast daily call volume using multiple forecasting approaches.
+
+The forecasting framework will compare traditional statistical models with deep learning methods.
+
+### Models
+
+#### Holt-Winters
+
+Used for:
+
+- Trend detection
+- Seasonality modeling
+- Baseline forecasting
+
+#### ARIMA
+
+Used for:
+
+- Autoregressive behavior
+- Time-series decomposition
+- Statistical benchmarking
+
+#### LSTM
+
+Used for:
+
+- Deep learning forecasting
+- Complex temporal patterns
+- Non-linear relationships
+
+### Forecasting Output
+
+Daily forecasted:
+
+- Call volume
+- Service requests
+- Expected workload
+
+### Model Evaluation
+
+Models will be evaluated using:
+
+- MAE
+- RMSE
+- MAPE
+- Forecast Bias
+
+### Deliverables
+
+- Forecast comparison framework
+- Daily forecast generation
+- Model performance reports
+
+---
+
+## Phase 3 — Workforce Optimization
+
+### Objective
+
+Determine the optimal staffing level required to handle forecasted call demand.
+
+The optimization engine will evolve through three progressively advanced scenarios.
+
+---
+
+### Scenario A
+
+#### Volume-Based Staffing
+
+**Input**
+
+- Forecasted call volume
+
+**Output**
+
+- Recommended staffing level
+
+**Goal**
+
+Determine the minimum number of agents required based solely on expected workload.
+
+---
+
+### Scenario B
+
+#### Service-Level Driven Staffing
+
+**Input**
+
+- Forecasted call volume
+- Service-level targets
+
+**Examples**
+
+- Answer 80% of calls within 30 seconds
+- Reduce customer waiting times
+
+**Output**
+
+- Staffing recommendations
+- Service-level compliance estimates
+
+**Goal**
+
+Balance staffing costs with customer service expectations.
+
+---
+
+### Scenario C
+
+#### Operational Workforce Optimization
+
+**Input**
+
+- Forecasted call volume
+- Service-level requirements
+- Agent productivity metrics
+- Shift schedules
+- Working-hour constraints
+
+**Output**
+
+- Daily staffing plans
+- Monthly staffing plans
+- Shift recommendations
+- Capacity utilization metrics
+
+**Goal**
+
+Develop an operational decision-support tool for workforce planning.
+
+---
+
+## Optimization Techniques
+
+Potential methods include:
+
+### Queueing Theory
+
+- Erlang C
+- Waiting-time analysis
+- Service-level estimation
+
+### Mathematical Optimization
+
+- Linear Programming
+- Integer Programming
+- Mixed Integer Programming
+
+### Simulation
+
+- Monte Carlo Simulation
+- Scenario Analysis
+
+---
+
+## Phase 4 — Analytics & Visualization
+
+### Objective
+
+Provide multiple user interfaces for consuming forecasts and staffing recommendations.
+
+---
+
+# 5. R Shiny Application
+
+### Purpose
+
+Develop an interactive forecasting portal using R.
+
+### Features
+
+- Historical trends
+- Forecast visualization
+- Model comparison
+- Error metrics
+- Workforce recommendations
+
+### Technology
+
+- R
+- Shiny
+- Plotly
+- DT
+
+---
+
+# 6. Python Dash Application
+
+### Purpose
+
+Provide a Python-based analytics interface.
+
+### Features
+
+- Interactive dashboards
+- Forecast comparison
+- Staffing recommendations
+- Operational metrics
+- Executive summaries
+
+### Technology
+
+- Python
+- Dash
+- Plotly
+- Pandas
+
+---
+
+# 7. Power BI Dashboard
+
+### Objective
+
+Create an executive call center dashboard.
+
+### Data Sources
+
+The dashboard will support:
+
+### Option A
+
+Direct connection to:
+
+```text
+Parquet Data Lake
+```
+
+### Option B
+
+Connection through:
+
+```text
+DuckDB
+```
+
+Future versions may also support:
+
+```text
+PostgreSQL
+```
+
+---
+
+## Power BI KPIs
+
+### Volume Metrics
+
+- Daily call volume
+- Monthly call volume
+- Requests by category
+- Requests by borough
+
+### Service Metrics
+
+- Average response time
+- Resolution time
+- Open requests
+- Closed requests
+
+### Forecast Metrics
+
+- Forecasted call volume
+- Forecast accuracy
+- Model comparison
+
+### Workforce Metrics
+
+- Required agents
+- Staffing utilization
+- Service-level achievement
+- Capacity gap analysis
+
+### Executive Metrics
+
+- Trends
+- Seasonality
+- Operational performance
+- Resource planning outlook
+
+---
+
+# 8. Repository Structure
+
+```text
+nyc311_pipeline/
+│
+├── src/
+│   ├── ingestion/
+│   ├── forecasting/
+│   ├── optimization/
+│   └── dashboard/
+│
+├── data/
+│   ├── staging/
+│   └── curated/
+│
+├── metadata/
+│
+├── logs/
+│
+├── reports/
+│
+├── powerbi/
+│
+├── shiny/
+│
+├── dash/
+│
+├── notebooks/
+│
+├── config/
+│
+├── requirements.txt
+│
+└── README.md
+```
+
+---
+
+# 9. Expected Outcomes
+
+Upon completion, the platform will provide:
+
+1. Automated NYC 311 data ingestion.
+2. Daily call volume forecasts using Holt-Winters, ARIMA, and LSTM.
+3. Workforce optimization recommendations.
+4. R Shiny forecasting dashboards.
+5. Python Dash forecasting dashboards.
+6. Executive Power BI dashboards.
+7. A reusable research platform for call center analytics and workforce planning.
+
+---
+
+# 10. Disclaimer
+
+This project is a research and prototype initiative intended to evaluate forecasting, optimization, and visualization techniques using publicly available NYC 311 data. Results should be validated before being used for operational staffing decisions in a production call center environment.
