@@ -1,60 +1,52 @@
 #!/usr/bin/env Rscript
 
+#!/usr/bin/env Rscript
+
 library(shiny)
 library(plotly)
 library(forecast)
-library(reticulate)
+library(arrow)
 
-options(shiny.port = as.integer(Sys.getenv("SHINY_PORT", unset = "5170")))
-options(shiny.host = Sys.getenv("SHINY_HOST", unset = "127.0.0.1"))
+options(shiny.port = as.integer(Sys.getenv("SHINY_PORT", unset = "3838")))
+options(shiny.host = Sys.getenv("SHINY_HOST", unset = "0.0.0.0"))
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
-script_path <- tryCatch(sys.frame(1)$ofile, error = function(e) "src/app.R")
-root <- normalizePath(file.path(dirname(script_path), ".."), mustWork = FALSE)
-data_root <- Sys.getenv("NYC311_DATA_ROOT", unset = file.path(root, "data"))
-parquet_glob <- file.path(data_root, "curated", "created_year=*", "created_month=*", "*.parquet")
 
-if (!length(Sys.glob(parquet_glob))) {
-  stop("No curated Parquet files found under ", file.path(data_root, "curated"))
+root <- "/srv/shiny-server"
+
+data_root <- Sys.getenv(
+  "NYC311_DATA_ROOT",
+  unset = root
+)
+
+dashboard_file <- file.path(
+  data_root,
+  "dashboard_data.parquet"
+)
+
+if (!file.exists(dashboard_file)) {
+  stop(
+    "Dashboard data not found at: ",
+    dashboard_file
+  )
 }
 
-# Aggregate in DuckDB through the existing project virtual environment.
-use_python(Sys.getenv("NYC311_PYTHON", unset = file.path(root, ".venv", "bin", "python")), required = FALSE)
-duckdb <- import("duckdb")
-connection <- duckdb$connect()
-query <- "
-WITH bounds AS (
-  SELECT min(CAST(created_date AS DATE)) AS min_date,
-         max(CAST(created_date AS DATE)) AS max_date
-  FROM read_parquet(?)
-), events AS (
-  SELECT CAST(created_date AS DATE) AS date,
-         upper(coalesce(nullif(trim(borough), ''), 'UNKNOWN')) AS borough,
-         count(DISTINCT unique_key) AS opened,
-         0::BIGINT AS closed
-  FROM read_parquet(?)
-  WHERE created_date IS NOT NULL
-  GROUP BY 1, 2
-  UNION ALL
-  SELECT CAST(closed_date AS DATE) AS date,
-         upper(coalesce(nullif(trim(borough), ''), 'UNKNOWN')) AS borough,
-         0::BIGINT AS opened,
-         count(DISTINCT unique_key) AS closed
-  FROM read_parquet(?) CROSS JOIN bounds
-  WHERE closed_date IS NOT NULL
-    AND CAST(closed_date AS DATE) BETWEEN bounds.min_date AND bounds.max_date
-  GROUP BY 1, 2
-)
-SELECT date, borough, sum(opened)::BIGINT AS opened, sum(closed)::BIGINT AS closed
-FROM events
-GROUP BY 1, 2
-ORDER BY 1, 2
-"
-data <- connection$execute(query, list(parquet_glob, parquet_glob, parquet_glob))$fetchdf()
-connection$close()
+data <- arrow::read_parquet(dashboard_file)
+
 data$date <- as.Date(data$date)
 
-boroughs <- c("ALL", "BRONX", "BROOKLYN", "MANHATTAN", "QUEENS", "STATEN ISLAND", "UNKNOWN", "UNSPECIFIED")
+data$borough <- toupper(trimws(data$borough))
+
+boroughs <- c(
+  "ALL",
+  "BRONX",
+  "BROOKLYN",
+  "MANHATTAN",
+  "QUEENS",
+  "STATEN ISLAND",
+  "UNKNOWN",
+  "UNSPECIFIED"
+)
 series_for <- function(data_type, borough) {
   result <- data[data$date >= min(data$date) & data$date <= max(data$date), ]
   if (borough != "ALL") result <- result[result$borough == borough, ]
@@ -97,7 +89,7 @@ ui <- fluidPage(
     column(8, plotlyOutput("Plot2", height = "48vh"))
   ),
   tags$footer(class = "footnote",
-    span("Source: NYC Open Data 311 Service Requests "),
+    span("Data Source: NYC Open Data 311 Service Requests "),
     span(class = "copyright", "(c) Samuel Aduroja")
   )
 )

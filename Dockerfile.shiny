@@ -1,0 +1,27 @@
+FROM rocker/shiny:4.4.2
+
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libtiff-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN R -e "install.packages(c('shiny', 'plotly', 'forecast', 'arrow'), repos='https://cloud.r-project.org')"
+RUN rm -rf /srv/shiny-server/*
+
+COPY src/app.R /srv/shiny-server/app.R
+COPY data/dashboard_data.parquet /srv/shiny-server/dashboard_data.parquet
+COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
+
+RUN chown -R shiny:shiny /srv/shiny-server
+
+EXPOSE 3838
+
+CMD ["/usr/bin/shiny-server"]
