@@ -1,5 +1,15 @@
 # NYC 311 Call Center Analytics & Workforce Optimization Platform
 
+## Dashboard
+
+Run the interactive Dash app from the repository root:
+
+```bash
+python src/app.py
+```
+
+Then open `http://127.0.0.1:8050`. The dashboard reads the curated Parquet lake and intentionally projects only `unique_key`, `created_date`, `closed_date`, and `borough`. Set `NYC311_DATA_ROOT` when the data lake lives outside the repository.
+
 ### Research / Prototype Project
 
 ---
