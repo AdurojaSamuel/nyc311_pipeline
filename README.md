@@ -1,14 +1,31 @@
 # NYC 311 Call Center Analytics & Workforce Optimization Platform
 
-## Dashboard
+## Applications
 
-Run the interactive Dash app from the repository root:
+The repository currently provides two interactive applications. Both read the curated Parquet lake and aggregate requests before plotting, so they do not load the full raw dataset into application memory.
+
+### Python Dash
 
 ```bash
+source .venv/bin/activate
 python src/app.py
 ```
 
-Then open `http://127.0.0.1:8050`. The dashboard reads the curated Parquet lake and intentionally projects only `unique_key`, `created_date`, `closed_date`, and `borough`. Set `NYC311_DATA_ROOT` when the data lake lives outside the repository.
+Open `http://127.0.0.1:8050`.
+
+The Dash application provides separate opened and closed request views, borough filtering, monthly Holt-Winters, ARIMA, and LSTM-style forecasts, forecast confidence bands, and independent `view` buttons.
+
+### R Shiny
+
+The R implementation follows the original Shiny layout and behavior:
+
+```bash
+Rscript src/app.R
+```
+
+Open `http://127.0.0.1:5170`. The R app uses Shiny, Plotly, Forecast, Zoo, and Reticulate. Reticulate calls the Python environment's DuckDB package to aggregate the Parquet lake. Set `NYC311_PYTHON` if the Python executable is not `.venv/bin/python`.
+
+For either application, set `NYC311_DATA_ROOT` when the data lake is outside the repository. The current local lake contains data from `2020-01-01` through `2026-08-25`.
 
 ### Research / Prototype Project
 
@@ -304,20 +321,22 @@ Provide multiple user interfaces for consuming forecasts and staffing recommenda
 
 Develop an interactive forecasting portal using R.
 
-### Features
+### Current Features
 
-- Historical trends
-- Forecast visualization
-- Model comparison
-- Error metrics
-- Workforce recommendations
+- Daily opened and closed request history.
+- Borough filtering.
+- Monthly Holt-Winters and ARIMA forecasts.
+- LSTM-style seasonal forecast with a residual-based 95% confidence interval.
+- Plotly visualization with R-style two-panel controls.
 
 ### Technology
 
 - R
 - Shiny
 - Plotly
-- DT
+- Forecast
+- Zoo
+- Reticulate
 
 ---
 
@@ -327,13 +346,13 @@ Develop an interactive forecasting portal using R.
 
 Provide a Python-based analytics interface.
 
-### Features
+### Current Features
 
-- Interactive dashboards
-- Forecast comparison
-- Staffing recommendations
-- Operational metrics
-- Executive summaries
+- Daily opened and closed request history.
+- Borough filtering.
+- Monthly Holt-Winters, ARIMA, and LSTM-style forecasts.
+- Forecast confidence bands.
+- DuckDB-backed aggregation of the curated Parquet lake.
 
 ### Technology
 
@@ -421,34 +440,23 @@ PostgreSQL
 ```text
 nyc311_pipeline/
 │
-├── src/
-│   ├── ingestion/
-│   ├── forecasting/
-│   ├── optimization/
-│   └── dashboard/
-│
+├── config/                         # Pipeline configuration
 ├── data/
-│   ├── staging/
-│   └── curated/
-│
+│   ├── staging/                    # Raw extraction batches
+│   └── curated/                    # Partitioned Parquet lake
+├── logs/                           # Pipeline logs
 ├── metadata/
-│
-├── logs/
-│
-├── reports/
-│
-├── powerbi/
-│
-├── shiny/
-│
-├── dash/
-│
-├── notebooks/
-│
-├── config/
-│
-├── requirements.txt
-│
+│   ├── state.json                  # Incremental ingestion state
+│   └── runs/                       # Run manifests and checkpoints
+├── reports/                        # Generated project reports
+├── scripts/
+│   └── run_incremental_with_email.sh
+├── src/
+│   ├── app.py                      # Python Dash application
+│   ├── app.R                       # R Shiny application
+│   ├── nyc311_pipeline.py          # Ingestion and curation pipeline
+│   └── *.ipynb                     # Analysis notebooks
+├── requirements.txt                # Python dependencies
 └── README.md
 ```
 
