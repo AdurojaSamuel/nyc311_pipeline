@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: nyc311-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn src.app:server
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11

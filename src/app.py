@@ -17,44 +17,108 @@ CURATED = DATA_ROOT / "curated"
 
 
 def load_data() -> pd.DataFrame:
-    """Read daily opened/closed counts without materializing raw requests."""
-    parquet_glob = str(CURATED / "created_year=*" / "created_month=*" / "*.parquet")
-    if not list(CURATED.glob("created_year=*/created_month=*/*.parquet")):
-        raise FileNotFoundError(f"No curated Parquet files found under {CURATED}")
+    """
+    Load the compact dashboard dataset when available.
+
+    Falls back to the full curated Parquet data lake for local
+    development if dashboard_data.parquet does not exist.
+    """
+
+    dashboard_file = DATA_ROOT / "dashboard_data.parquet"
+
+    # Preferred path for deployment.
+    if dashboard_file.exists():
+        print(f"Loading dashboard data from: {dashboard_file}")
+
+        frame = pd.read_parquet(dashboard_file)
+
+        frame["date"] = pd.to_datetime(frame["date"])
+
+        return (
+            frame
+            .sort_values(["date", "borough"])
+            .reset_index(drop=True)
+        )
+
+    # Fallback to the full Parquet data lake.
+    parquet_glob = str(
+        CURATED / "created_year=*" / "created_month=*" / "*.parquet"
+    )
+
+    if not list(
+        CURATED.glob("created_year=*/created_month=*/*.parquet")
+    ):
+        raise FileNotFoundError(
+            f"No dashboard_data.parquet or curated Parquet files "
+            f"found under {DATA_ROOT}"
+        )
 
     query = """
         WITH bounds AS (
-            SELECT min(CAST(created_date AS DATE)) AS min_date,
-                   max(CAST(created_date AS DATE)) AS max_date
+            SELECT
+                min(CAST(created_date AS DATE)) AS min_date,
+                max(CAST(created_date AS DATE)) AS max_date
             FROM read_parquet(?, union_by_name=true)
-        ), events AS (
-            SELECT CAST(created_date AS DATE) AS date,
-                   upper(coalesce(nullif(trim(borough), ''), 'UNKNOWN')) AS borough,
-                   count(DISTINCT unique_key) AS opened,
-                   0::BIGINT AS closed
+        ),
+
+        events AS (
+            SELECT
+                CAST(created_date AS DATE) AS date,
+                upper(
+                    coalesce(
+                        nullif(trim(borough), ''),
+                        'UNKNOWN'
+                    )
+                ) AS borough,
+                count(DISTINCT unique_key) AS opened,
+                0::BIGINT AS closed
             FROM read_parquet(?, union_by_name=true)
             WHERE created_date IS NOT NULL
             GROUP BY 1, 2
+
             UNION ALL
-            SELECT CAST(closed_date AS DATE) AS date,
-                   upper(coalesce(nullif(trim(borough), ''), 'UNKNOWN')) AS borough,
-                   0::BIGINT AS opened,
-                   count(DISTINCT unique_key) AS closed
+
+            SELECT
+                CAST(closed_date AS DATE) AS date,
+                upper(
+                    coalesce(
+                        nullif(trim(borough), ''),
+                        'UNKNOWN'
+                    )
+                ) AS borough,
+                0::BIGINT AS opened,
+                count(DISTINCT unique_key) AS closed
             FROM read_parquet(?, union_by_name=true)
-                        CROSS JOIN bounds
-                        WHERE closed_date IS NOT NULL
-                            AND CAST(closed_date AS DATE) BETWEEN bounds.min_date AND bounds.max_date
+            CROSS JOIN bounds
+            WHERE closed_date IS NOT NULL
+              AND CAST(closed_date AS DATE)
+                  BETWEEN bounds.min_date AND bounds.max_date
             GROUP BY 1, 2
         )
-        SELECT date, borough, sum(opened)::BIGINT AS opened, sum(closed)::BIGINT AS closed
+
+        SELECT
+            date,
+            borough,
+            sum(opened)::BIGINT AS opened,
+            sum(closed)::BIGINT AS closed
         FROM events
         GROUP BY 1, 2
         ORDER BY 1, 2
     """
+
     with duckdb.connect() as connection:
-        frame = connection.execute(query, [parquet_glob, parquet_glob, parquet_glob]).df()
+        frame = connection.execute(
+            query,
+            [parquet_glob, parquet_glob, parquet_glob],
+        ).df()
+
     frame["date"] = pd.to_datetime(frame["date"])
-    return frame
+
+    return (
+        frame
+        .sort_values(["date", "borough"])
+        .reset_index(drop=True)
+    )
 
 
 DATA = load_data()
@@ -168,6 +232,7 @@ def control_panel(data_type_id: str, borough_id: str, button_id: str, include_fo
     return html.Div(controls, style=CONTROL_STYLE)
 
 app = Dash(__name__, title="Opened and Closed Service Requests")
+server = app.server
 app.layout = html.Div([
     html.H4("Opened and Closed Service Requests", style={"fontWeight": "400", "margin": "6px 1.5% 8px"}),
     html.Div([
