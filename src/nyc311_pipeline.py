@@ -7,6 +7,8 @@ from typing import Any
 
 import duckdb
 import pandas as pd
+
+from powerbi_duckdb import build_powerbi_db
 import requests
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
