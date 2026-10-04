@@ -328,6 +328,9 @@ def commit_run(
     if not KEEP_STAGING:
         shutil.rmtree(STAGING / run_id, ignore_errors=True)
 
+    powerbi_db = build_powerbi_db(CURATED)
+    logging.info("Power BI DuckDB updated: %s", powerbi_db)
+
 def run_full(start: dt.date, end: dt.date) -> None:
     run_id = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
     all_files, all_months, total, seq = [], set(), 0, 0
@@ -351,6 +354,8 @@ def run_incremental() -> None:
     if total == 0:
         write_json_atomic(RUNS / f"{run_id}.json", {"status": "success", "mode": "incremental", "staged_rows": 0})
         logging.info("No new rows.")
+        powerbi_db = build_powerbi_db(CURATED)
+        logging.info("Power BI DuckDB updated: %s", powerbi_db)
         return
     commit_run(run_id, files, months, "incremental", total)
 
