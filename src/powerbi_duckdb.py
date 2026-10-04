@@ -159,10 +159,21 @@ def build_powerbi_db(curated: Path = CURATED, db_path: Path = DEFAULT_DB) -> Pat
                 descriptor,
                 complaint_category,
                 CASE WHEN borough_raw IN ('BRONX','BROOKLYN','MANHATTAN','QUEENS','STATEN ISLAND')
-                     THEN initcap(borough_raw) ELSE 'Unspecified' END AS borough,
+                     THEN CASE borough_raw
+                         WHEN 'BRONX' THEN 'Bronx'
+                         WHEN 'BROOKLYN' THEN 'Brooklyn'
+                         WHEN 'MANHATTAN' THEN 'Manhattan'
+                         WHEN 'QUEENS' THEN 'Queens'
+                         WHEN 'STATEN ISLAND' THEN 'Staten Island'
+                     END ELSE 'Unspecified' END AS borough,
                 community_board,
                 CASE WHEN channel_raw IN ('ONLINE','PHONE','MOBILE','OTHER')
-                     THEN initcap(channel_raw) ELSE 'Unknown' END AS channel,
+                     THEN CASE channel_raw
+                         WHEN 'ONLINE' THEN 'Online'
+                         WHEN 'PHONE' THEN 'Phone'
+                         WHEN 'MOBILE' THEN 'Mobile'
+                         WHEN 'OTHER' THEN 'Other'
+                     END ELSE 'Unknown' END AS channel,
                 status,
                 is_closed,
                 resolution_hours,
@@ -238,9 +249,16 @@ def build_powerbi_db(curated: Path = CURATED, db_path: Path = DEFAULT_DB) -> Pat
                 community_board,
                 CASE
                     WHEN regexp_matches(community_board, '^[0-9]{2} ')
-                    THEN initcap(substr(community_board, 4)) || ' CB ' || substr(community_board, 1, 2)
+                    THEN CASE upper(substr(community_board, 4))
+                        WHEN 'BRONX' THEN 'Bronx'
+                        WHEN 'BROOKLYN' THEN 'Brooklyn'
+                        WHEN 'MANHATTAN' THEN 'Manhattan'
+                        WHEN 'QUEENS' THEN 'Queens'
+                        WHEN 'STATEN ISLAND' THEN 'Staten Island'
+                        ELSE substr(community_board, 4)
+                    END || ' CB ' || substr(community_board, 1, 2)
                     WHEN community_board LIKE 'Unspecified %'
-                    THEN initcap(substr(community_board, 13)) || ' - Unspecified'
+                    THEN substr(community_board, 13) || ' - Unspecified'
                     ELSE 'Unspecified'
                 END AS board_name,
                 CASE
