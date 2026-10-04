@@ -19,7 +19,7 @@ import pandas as pd
 ROOT = Path(os.getenv("NYC311_ROOT", Path(__file__).resolve().parents[1]))
 DATA_ROOT = Path(os.getenv("NYC311_DATA_ROOT", ROOT / "data"))
 CURATED = DATA_ROOT / "curated"
-DEFAULT_DB = Path(os.getenv("NYC311_POWERBI_DB", DATA_ROOT / "powerbi" / "nyc311_powerbi.duckdb"))
+DEFAULT_DB = Path(os.getenv("NYC311_POWERBI_DB", DATA_ROOT / "nyc311_powerbi.duckdb"))
 
 
 def _sql_path(path: Path) -> str:
