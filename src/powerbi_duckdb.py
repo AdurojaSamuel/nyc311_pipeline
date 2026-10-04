@@ -154,6 +154,7 @@ def build_powerbi_db(curated: Path = CURATED, db_path: Path = DEFAULT_DB) -> Pat
                 FROM metrics
             )
             SELECT
+                created_ts,
                 cast(created_ts AS DATE) AS created_date,
                 extract(hour FROM created_ts)::BIGINT AS created_hour,
                 cast(closed_ts AS DATE) AS closed_date,
