@@ -15,6 +15,9 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ROOT = Path(os.getenv("NYC311_ROOT", Path(__file__).resolve().parents[1]))
 DATA_ROOT = Path(os.getenv("NYC311_DATA_ROOT", ROOT / "data"))
