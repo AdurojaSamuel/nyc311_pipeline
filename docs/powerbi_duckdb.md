@@ -7,7 +7,7 @@ and builds a Power BI-ready DuckDB database after each successful pipeline run.
 
 By default:
 
-`<NYC311_DATA_ROOT>/powerbi/nyc311_powerbi.duckdb`
+`<NYC311_DATA_ROOT>/nyc311_powerbi.duckdb`
 
 Override it with `NYC311_POWERBI_DB`.
 
@@ -42,16 +42,16 @@ In Power BI, replace the Parquet staging query and downstream transformation
 queries with imports of the five prepared DuckDB tables. Keep the existing
 relationships, DAX measures, visuals, and incremental-refresh policy initially.
 
-For `service_requests`, apply the Power BI incremental-refresh predicate to
-`created_date`:
+For `service_requests`, apply the Power BI incremental-refresh predicate to the
+DateTime column `created_ts`:
 
 ```text
-created_date >= RangeStart
-created_date <  RangeEnd
+created_ts >= RangeStart
+created_ts <  RangeEnd
 ```
 
-If Power BI requires DateTime for the policy, cast `created_date` to timestamp
-in the Power Query source step before applying the predicate.
+Keep `created_date` for reporting and date-model relationships; `created_ts` is
+the technical timestamp used for partition boundaries.
 
 ## Scheduling
 
