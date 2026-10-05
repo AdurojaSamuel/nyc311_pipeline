@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse, datetime as dt, json, logging, os, shutil, sys, uuid
+import argparse
+import datetime as dt
+import json
+import logging
+import os
+import shutil
+import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
 import duckdb
 import pandas as pd
+
 import requests
+
+from powerbi_duckdb import build_powerbi_db
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -17,7 +27,7 @@ load_dotenv()
 DATASET_ID = "erm2-nwe9"
 API_URL = os.getenv("NYC311_API_URL")
 APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
-ROOT = Path(os.getenv("NYC311_ROOT"))
+ROOT = Path(os.getenv("NYC311_ROOT", Path(__file__).resolve().parents[1]))
 DATA_ROOT = Path(os.getenv("NYC311_DATA_ROOT", ROOT / "data"))
 
 STAGING = DATA_ROOT / "staging"
@@ -25,14 +35,15 @@ CURATED = DATA_ROOT / "curated"
 META = ROOT / "metadata"
 RUNS = META / "runs"
 LOGS = ROOT / "logs"
-PAGE_SIZE = int(os.getenv("PAGE_SIZE"))
-TIMEOUT = int(os.getenv("REQUEST_TIMEOUT_SECONDS"))
+PAGE_SIZE = int(os.getenv("PAGE_SIZE", "50000"))
+TIMEOUT = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
 KEEP_STAGING = os.getenv("KEEP_STAGING", "0") == "1"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 TIMESTAMP_COLS = ["created_date", "closed_date", "due_date", "resolution_action_updated_date"]
 
 def setup() -> None:
+    """Create runtime directories and configure application logging."""
     for p in [STAGING, CURATED, META, RUNS, LOGS]:
         p.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -45,15 +56,18 @@ def setup() -> None:
     )
 
 def read_json(path: Path, default: Any = None) -> Any:
+    """Read JSON from *path*, returning *default* when it does not exist."""
     return json.loads(path.read_text()) if path.exists() else default
 
 def write_json_atomic(path: Path, value: Any) -> None:
+    """Write JSON atomically so readers never observe a partial file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(value, indent=2, sort_keys=True, default=str))
     tmp.replace(path)
 
 def session() -> requests.Session:
+    """Return a retry-enabled Socrata HTTP session."""
     s = requests.Session()
     retry = Retry(
         total=7,
@@ -326,6 +340,9 @@ def commit_run(
     if not KEEP_STAGING:
         shutil.rmtree(STAGING / run_id, ignore_errors=True)
 
+    powerbi_db = build_powerbi_db(CURATED)
+    logging.info("Power BI DuckDB updated: %s", powerbi_db)
+
 def run_full(start: dt.date, end: dt.date) -> None:
     run_id = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
     all_files, all_months, total, seq = [], set(), 0, 0
@@ -349,6 +366,8 @@ def run_incremental() -> None:
     if total == 0:
         write_json_atomic(RUNS / f"{run_id}.json", {"status": "success", "mode": "incremental", "staged_rows": 0})
         logging.info("No new rows.")
+        powerbi_db = build_powerbi_db(CURATED)
+        logging.info("Power BI DuckDB updated: %s", powerbi_db)
         return
     commit_run(run_id, files, months, "incremental", total)
 
@@ -361,7 +380,8 @@ def run_range(start: dt.date, end: dt.date) -> None:
         all_files.extend(files); all_months |= months; total += n
     commit_run(run_id, all_files, all_months, "range", total)
 
-def main():
+def main() -> None:
+    """Parse CLI arguments and run the requested pipeline operation."""
     setup()
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -385,7 +405,7 @@ def main():
             run_range(dt.date.fromisoformat(args.start_date), dt.date.fromisoformat(args.end_date))
         elif args.cmd == "validate":
             print(json.dumps({"state": read_json(META / "state.json"), "counts": row_counts()}, indent=2, default=str))
-    except Exception as e:
+    except Exception:
         logging.exception("Pipeline failed")
         raise
 
