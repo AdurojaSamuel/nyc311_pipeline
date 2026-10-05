@@ -26,11 +26,13 @@ DEFAULT_DB = Path(os.getenv("NYC311_POWERBI_DB", DATA_ROOT / "nyc311_powerbi.duc
 
 
 def _sql_path(path: Path) -> str:
+    """Return a DuckDB-safe, platform-independent SQL path."""
     return str(path).replace("\\", "/").replace("'", "''")
 
 
 def _inventory(files: list[Path], curated: Path) -> pd.DataFrame:
-    rows = []
+    """Build file-level lineage metadata for curated Parquet files."""
+    rows: list[dict[str, object]] = []
     for f in files:
         rel = f.relative_to(curated)
         parts = rel.parts
@@ -49,6 +51,18 @@ def _inventory(files: list[Path], curated: Path) -> pd.DataFrame:
 
 
 def build_powerbi_db(curated: Path = CURATED, db_path: Path = DEFAULT_DB) -> Path:
+    """Rebuild and atomically publish the DuckDB serving database.
+
+    Args:
+        curated: Root directory containing year/month partitioned Parquet files.
+        db_path: Destination path for the published DuckDB database.
+
+    Returns:
+        Path to the successfully published DuckDB database.
+
+    Raises:
+        RuntimeError: If no curated Parquet files are available.
+    """
     files = sorted(curated.glob("created_year=*/created_month=*/*.parquet"))
     if not files:
         raise RuntimeError(f"No curated Parquet files found under {curated}")
@@ -354,7 +368,8 @@ def build_powerbi_db(curated: Path = CURATED, db_path: Path = DEFAULT_DB) -> Pat
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    """Build the Power BI serving database from command-line arguments."""
+    parser = argparse.ArgumentParser(description="Build the NYC 311 Power BI DuckDB serving database.")
     parser.add_argument("--curated", type=Path, default=CURATED)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     args = parser.parse_args()
