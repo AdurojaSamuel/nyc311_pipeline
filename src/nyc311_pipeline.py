@@ -14,13 +14,12 @@ from typing import Any
 
 import duckdb
 import pandas as pd
-
 import requests
-
-from powerbi_duckdb import build_powerbi_db
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from powerbi_duckdb import build_powerbi_db
 
 load_dotenv()
 
@@ -42,6 +41,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 TIMESTAMP_COLS = ["created_date", "closed_date", "due_date", "resolution_action_updated_date"]
 
+
 def setup() -> None:
     """Create runtime directories and configure application logging."""
     for p in [STAGING, CURATED, META, RUNS, LOGS]:
@@ -55,9 +55,11 @@ def setup() -> None:
         ],
     )
 
+
 def read_json(path: Path, default: Any = None) -> Any:
     """Read JSON from *path*, returning *default* when it does not exist."""
     return json.loads(path.read_text()) if path.exists() else default
+
 
 def write_json_atomic(path: Path, value: Any) -> None:
     """Write JSON atomically so readers never observe a partial file."""
@@ -65,6 +67,7 @@ def write_json_atomic(path: Path, value: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(value, indent=2, sort_keys=True, default=str))
     tmp.replace(path)
+
 
 def session() -> requests.Session:
     """Return a retry-enabled Socrata HTTP session."""
@@ -82,22 +85,28 @@ def session() -> requests.Session:
     )
     adapter = HTTPAdapter(max_retries=retry)
     s.mount("https://", adapter)
-    s.headers.update({
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "samuel-nyc311-local-parquet/1.0",
-    })
+    s.headers.update(
+        {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "samuel-nyc311-local-parquet/1.0",
+        }
+    )
     if APP_TOKEN:
         s.headers["X-App-Token"] = APP_TOKEN
     else:
         logging.warning("SOCRATA_APP_TOKEN is not set; expect lower throttling limits.")
     return s
 
+
 def rows_from_payload(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         rows = payload
     elif isinstance(payload, dict):
-        rows = next((payload[k] for k in ("data", "rows", "results") if isinstance(payload.get(k), list)), None)
+        rows = next(
+            (payload[k] for k in ("data", "rows", "results") if isinstance(payload.get(k), list)),
+            None,
+        )
         if rows is None:
             raise ValueError(f"Unexpected SODA response keys: {sorted(payload.keys())}")
     else:
@@ -105,6 +114,7 @@ def rows_from_payload(payload: Any) -> list[dict[str, Any]]:
     if not all(isinstance(r, dict) for r in rows):
         raise ValueError("API returned non-object rows")
     return rows
+
 
 def post_query(s: requests.Session, soql: str, page: int) -> list[dict[str, Any]]:
     body = {
@@ -117,12 +127,15 @@ def post_query(s: requests.Session, soql: str, page: int) -> list[dict[str, Any]
     r.raise_for_status()
     return rows_from_payload(r.json())
 
+
 def q(s: str) -> str:
     return s.replace("'", "''")
+
 
 def socrata_ts(ts: Any) -> str:
     t = pd.to_datetime(ts)
     return t.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+
 
 def normalize(rows: list[dict[str, Any]], run_id: str) -> pd.DataFrame:
     df = pd.DataFrame(rows)
@@ -132,7 +145,11 @@ def normalize(rows: list[dict[str, Any]], run_id: str) -> pd.DataFrame:
     for col in df.columns:
         if df[col].map(lambda x: isinstance(x, (dict, list))).any():
             df[col] = df[col].map(
-                lambda x: json.dumps(x, ensure_ascii=False, sort_keys=True) if isinstance(x, (dict, list)) else x
+                lambda x: (
+                    json.dumps(x, ensure_ascii=False, sort_keys=True)
+                    if isinstance(x, (dict, list))
+                    else x
+                )
             )
 
     if "unique_key" not in df or "created_date" not in df:
@@ -151,11 +168,13 @@ def normalize(rows: list[dict[str, Any]], run_id: str) -> pd.DataFrame:
     df["created_month"] = df["created_date"].dt.strftime("%m")
     return df
 
+
 def write_stage(df: pd.DataFrame, run_id: str, seq: int) -> Path:
     out = STAGING / run_id / f"part-{seq:06d}.parquet"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, engine="pyarrow", compression="zstd", index=False)
     return out
+
 
 def day_windows(start: dt.date, end: dt.date):
     cur = start
@@ -164,7 +183,10 @@ def day_windows(start: dt.date, end: dt.date):
         yield cur, min(nxt, end)
         cur = nxt
 
-def fetch_soql_to_stage(soql: str, run_id: str, seq0: int = 0) -> tuple[list[Path], set[tuple[str, str]], int]:
+
+def fetch_soql_to_stage(
+    soql: str, run_id: str, seq0: int = 0
+) -> tuple[list[Path], set[tuple[str, str]], int]:
     s = session()
     files, months = [], set()
     page, seq, total = 1, seq0, 0
@@ -176,13 +198,22 @@ def fetch_soql_to_stage(soql: str, run_id: str, seq0: int = 0) -> tuple[list[Pat
         if not df.empty:
             seq += 1
             files.append(write_stage(df, run_id, seq))
-            months.update(set(zip(df["created_year"], df["created_month"])))
+            months.update(
+                set(
+                    zip(
+                        df["created_year"],
+                        df["created_month"],
+                        strict=True,
+                    )
+                )
+            )
             total += len(df)
         logging.info("page=%s rows=%s total=%s", page, len(rows), total)
         if len(rows) < PAGE_SIZE:
             break
         page += 1
     return files, months, total
+
 
 def soql_for_day(start: dt.date, end: dt.date) -> str:
     a, b = f"{start.isoformat()}T00:00:00.000", f"{end.isoformat()}T00:00:00.000"
@@ -192,6 +223,7 @@ def soql_for_day(start: dt.date, end: dt.date) -> str:
         "ORDER BY `created_date`, `unique_key`"
     )
 
+
 def soql_incremental(last_created: str, last_key: str) -> str:
     c, k = q(last_created), q(last_key)
     return (
@@ -200,8 +232,10 @@ def soql_incremental(last_created: str, last_key: str) -> str:
         "ORDER BY `created_date`, `unique_key`"
     )
 
+
 def sql_list(paths: list[Path]) -> str:
     return "[" + ",".join("'" + str(p).replace("'", "''") + "'" for p in paths) + "]"
+
 
 def merge_month(year: str, month: str, stage_files: list[Path], run_id: str) -> None:
     final_dir = CURATED / f"created_year={year}" / f"created_month={month}"
@@ -249,6 +283,7 @@ def merge_month(year: str, month: str, stage_files: list[Path], run_id: str) -> 
             bak_dir.rename(final_dir)
         raise
 
+
 def high_watermark_from_dataset() -> dict[str, str] | None:
     files = list(CURATED.glob("created_year=*/created_month=*/*.parquet"))
     if not files:
@@ -266,6 +301,7 @@ def high_watermark_from_dataset() -> dict[str, str] | None:
         con.close()
     return {"created_date": socrata_ts(row[0]), "unique_key": str(row[1])} if row else None
 
+
 def row_counts() -> dict[str, int]:
     files = list(CURATED.glob("created_year=*/created_month=*/*.parquet"))
     if not files:
@@ -279,6 +315,7 @@ def row_counts() -> dict[str, int]:
     finally:
         con.close()
     return {"rows": rows, "distinct_unique_key": distinct_keys, "duplicates": rows - distinct_keys}
+
 
 def commit_run(
     run_id: str,
@@ -343,6 +380,7 @@ def commit_run(
     powerbi_db = build_powerbi_db(CURATED)
     logging.info("Power BI DuckDB updated: %s", powerbi_db)
 
+
 def run_full(start: dt.date, end: dt.date) -> None:
     run_id = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
     all_files, all_months, total, seq = [], set(), 0, 0
@@ -350,11 +388,15 @@ def run_full(start: dt.date, end: dt.date) -> None:
         logging.info("full window %s to %s", a, b)
         files, months, n = fetch_soql_to_stage(soql_for_day(a, b), run_id, seq)
         seq += len(files)
-        all_files.extend(files); all_months |= months; total += n
-        write_json_atomic(RUNS / f"{run_id}.checkpoint.json", {
-            "status": "running", "last_window_start": str(a), "staged_rows": total
-        })
+        all_files.extend(files)
+        all_months |= months
+        total += n
+        write_json_atomic(
+            RUNS / f"{run_id}.checkpoint.json",
+            {"status": "running", "last_window_start": str(a), "staged_rows": total},
+        )
     commit_run(run_id, all_files, all_months, "full", total)
+
 
 def run_incremental() -> None:
     state = read_json(META / "state.json")
@@ -362,14 +404,19 @@ def run_incremental() -> None:
         raise SystemExit("No high-watermark found. Run full load first.")
     wm = state["high_watermark"]
     run_id = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
-    files, months, total = fetch_soql_to_stage(soql_incremental(wm["created_date"], wm["unique_key"]), run_id)
+    files, months, total = fetch_soql_to_stage(
+        soql_incremental(wm["created_date"], wm["unique_key"]), run_id
+    )
     if total == 0:
-        write_json_atomic(RUNS / f"{run_id}.json", {"status": "success", "mode": "incremental", "staged_rows": 0})
+        write_json_atomic(
+            RUNS / f"{run_id}.json", {"status": "success", "mode": "incremental", "staged_rows": 0}
+        )
         logging.info("No new rows.")
         powerbi_db = build_powerbi_db(CURATED)
         logging.info("Power BI DuckDB updated: %s", powerbi_db)
         return
     commit_run(run_id, files, months, "incremental", total)
+
 
 def run_range(start: dt.date, end: dt.date) -> None:
     run_id = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
@@ -377,8 +424,11 @@ def run_range(start: dt.date, end: dt.date) -> None:
     for a, b in day_windows(start, end):
         files, months, n = fetch_soql_to_stage(soql_for_day(a, b), run_id, seq)
         seq += len(files)
-        all_files.extend(files); all_months |= months; total += n
+        all_files.extend(files)
+        all_months |= months
+        total += n
     commit_run(run_id, all_files, all_months, "range", total)
+
 
 def main() -> None:
     """Parse CLI arguments and run the requested pipeline operation."""
@@ -397,17 +447,28 @@ def main() -> None:
 
     try:
         if args.cmd == "full":
-            end = dt.date.fromisoformat(args.end_date) if args.end_date else dt.datetime.utcnow().date() + dt.timedelta(days=1)
+            end = (
+                dt.date.fromisoformat(args.end_date)
+                if args.end_date
+                else dt.datetime.utcnow().date() + dt.timedelta(days=1)
+            )
             run_full(dt.date.fromisoformat(args.start_date), end)
         elif args.cmd == "incremental":
             run_incremental()
         elif args.cmd == "range":
             run_range(dt.date.fromisoformat(args.start_date), dt.date.fromisoformat(args.end_date))
         elif args.cmd == "validate":
-            print(json.dumps({"state": read_json(META / "state.json"), "counts": row_counts()}, indent=2, default=str))
+            print(
+                json.dumps(
+                    {"state": read_json(META / "state.json"), "counts": row_counts()},
+                    indent=2,
+                    default=str,
+                )
+            )
     except Exception:
         logging.exception("Pipeline failed")
         raise
+
 
 if __name__ == "__main__":
     main()

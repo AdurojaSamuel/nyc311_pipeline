@@ -7,6 +7,7 @@ completed successfully.  Power BI should connect to this database through the
 DuckDB ODBC driver and import the prepared tables instead of repeating the
 heavy M transformations.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -369,7 +370,9 @@ def build_powerbi_db(curated: Path = CURATED, db_path: Path = DEFAULT_DB) -> Pat
 
 def main() -> None:
     """Build the Power BI serving database from command-line arguments."""
-    parser = argparse.ArgumentParser(description="Build the NYC 311 Power BI DuckDB serving database.")
+    parser = argparse.ArgumentParser(
+        description="Build the NYC 311 Power BI DuckDB serving database."
+    )
     parser.add_argument("--curated", type=Path, default=CURATED)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     args = parser.parse_args()
