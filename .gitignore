@@ -1,2 +1,23 @@
+# Local datasets and generated serving databases
 data/curated/
 data/staging/
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+
+# Runtime state
+logs/
+metadata/runs/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
