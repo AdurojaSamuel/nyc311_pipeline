@@ -2,7 +2,7 @@
 
 ## Applications
 
-The repository currently provides three interactive applications. The monthly dashboards read the curated Parquet lake and aggregate requests before plotting, while the hourly workforce app queries source-level aggregates; none load the full raw dataset into application memory.
+The repository currently provides four interactive applications. The monthly dashboards read the curated Parquet lake and aggregate requests before plotting, while the hourly workforce apps query source-level aggregates; none load the full raw dataset into application memory.
 
 ### Python Dash
 
@@ -40,6 +40,33 @@ Run the separate interactive hourly scenario app:
 Open `http://127.0.0.1:8051`. The app fetches current NYC 311 creation timestamps aggregated by date/hour/borough from the public NYC Open Data endpoint. A recent same-weekday hourly baseline is evaluated with rolling-origin validation, then scaled by the editable calls-per-request assumption. This dataset contains service requests, not ACD call arrivals, agent timecards, or labor costs; the call conversion and staffing controls are scenario inputs and must be calibrated against real call-center data.
 
 The allocation engine uses SciPy's HiGHS mixed-integer linear programming solver. It first minimizes same-hour unserved calls under the daily shift budget, then minimizes complete-shift labor cost without worsening that service result. The model includes one shift per agent, shift eligibility, half-hour midpoint break capacity, handle-time/occupancy-based hourly capacity, per-shift maximum/optional minimum workloads, and the daily budget. An optional CSV roster can supply per-agent eligible shifts and rates. See the dashboard notes for limitations around live queues, skills, contracts, and production scheduling.
+
+### Supervisor workforce-control dashboard
+
+Run a separate supervisor-oriented daily planning dashboard:
+
+```bash
+.venv/bin/python src/workforce_control_app.py
+```
+
+Open `http://127.0.0.1:8052`. The dark operations dashboard uses current hourly service-request aggregates, a 56-day same-weekday 75th-percentile forecast, rolling-origin validation, a configurable demand buffer, and the HiGHS MILP to show shift-level costs, safe hourly capacity, shortfalls, and a downloadable JSON scenario. Its request-to-call conversion, available agents, wage, and operating limits are assumptions, not values published by NYC Open Data. Exported schedules are planning artifacts for human review and are not automatically approved, saved, or published.
+
+### Dashboard PDF guides
+
+Detailed operating, data, model, and safety guides are provided separately for all four dashboards:
+
+- [Python monthly Volume Lab](docs/dashboard-guides/python-volume-dashboard.pdf)
+- [R Shiny monthly dashboard](docs/dashboard-guides/r-shiny-volume-dashboard.pdf)
+- [Hourly workforce optimizer](docs/dashboard-guides/hourly-staffing-optimizer.pdf)
+- [Supervisor Workforce Control](docs/dashboard-guides/workforce-control-dashboard.pdf)
+
+Regenerate the PDFs after changing dashboard behavior or documentation:
+
+```bash
+.venv/bin/python scripts/generate_dashboard_pdfs.py
+```
+
+The PDF generator dependency is in `requirements-dev.txt` (`reportlab`); install development requirements with `pip install -r requirements-dev.txt`.
 
 ### Forecast tracking and model selection
 
