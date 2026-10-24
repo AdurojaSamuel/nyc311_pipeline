@@ -59,11 +59,18 @@ Detailed operating, data, model, and safety guides are provided separately for a
 - [R Shiny monthly dashboard](docs/dashboard-guides/r-shiny-volume-dashboard.pdf)
 - [Hourly workforce optimizer](docs/dashboard-guides/hourly-staffing-optimizer.pdf)
 - [Supervisor Workforce Control](docs/dashboard-guides/workforce-control-dashboard.pdf)
+- [Technical reference: Workforce Control and Hourly Staffing Optimizer](docs/dashboard-guides/workforce-optimization-technical-reference.pdf)
 
 Regenerate the PDFs after changing dashboard behavior or documentation:
 
 ```bash
 .venv/bin/python scripts/generate_dashboard_pdfs.py
+```
+
+Regenerate the combined workforce technical reference separately:
+
+```bash
+.venv/bin/python scripts/generate_workforce_technical_pdf.py
 ```
 
 The PDF generator dependency is in `requirements-dev.txt` (`reportlab`); install development requirements with `pip install -r requirements-dev.txt`.
