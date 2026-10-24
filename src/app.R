@@ -11,9 +11,14 @@ options(shiny.host = Sys.getenv("SHINY_HOST", unset = "0.0.0.0"))
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
 
+format_number <- function(value, digits = 0) {
+  formatC(as.numeric(value), format = "f", digits = digits, big.mark = ",")
+}
+
 app_argument <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
-app_dir <- if (length(app_argument)) {
-  dirname(normalizePath(sub("^--file=", "", app_argument[[1]])))
+script_path <- if (length(app_argument)) sub("^--file=", "", app_argument[[1]]) else ""
+app_dir <- if (nzchar(script_path) && file.exists(script_path)) {
+  dirname(normalizePath(script_path))
 } else if (file.exists(file.path(getwd(), "app.R"))) {
   getwd()
 } else {
@@ -236,15 +241,15 @@ server <- function(input, output, session) {
     staffing <- result$staffing
     paste0(
       "Forecast: ", result$forecast$model,
-      " (holdout MAE ", format(round(result$forecast$validation_mae, 1), big.mark = ","),
+      " (holdout MAE ", format_number(result$forecast$validation_mae, 1),
       "; MLflow run ", result$forecast$best_run_id, "). Recommended call-takers: ",
       min(staffing$call_takers), "–", max(staffing$call_takers),
       ". Modeled service level is at least ",
-      format(round(min(staffing$service_level) * 100, 1), nsmall = 1),
+      format_number(min(staffing$service_level) * 100, 1),
       "% with peak occupancy ",
-      format(round(max(staffing$occupancy) * 100, 1), nsmall = 1), "%",
+      format_number(max(staffing$occupancy) * 100, 1), "%",
       ". Estimated savings vs fixed peak staffing: $",
-      format(round(sum(staffing$monthly_savings)), big.mark = ","),
+      format_number(sum(staffing$monthly_savings)),
       ". Planning estimate only; schedules must account for intraday peaks, breaks, and labor rules."
     )
   })
