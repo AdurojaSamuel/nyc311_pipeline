@@ -8,4 +8,8 @@ python-dotenv>=1.0
 dash>=2.17
 plotly>=5.22
 statsmodels>=0.14
+pmdarima>=2.0
+threadpoolctl>=3.1
+torch>=2.2
+mlflow>=2.12
 gunicorn

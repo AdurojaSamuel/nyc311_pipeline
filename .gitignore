@@ -4,6 +4,8 @@ data/staging/
 *.duckdb
 *.duckdb.wal
 *.duckdb.tmp
+mlruns/
+mlartifacts/
 
 # Runtime state
 logs/

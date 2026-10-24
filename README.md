@@ -13,19 +13,27 @@ python src/app.py
 
 Open `http://127.0.0.1:8050`.
 
-The Dash application provides separate opened and closed request views, borough filtering, monthly Holt-Winters, ARIMA, and LSTM-style forecasts, forecast confidence bands, and independent `view` buttons.
+The Dash application provides separate opened and closed request views, borough filtering, real Holt-Winters, automatic ARIMA/SARIMA, and trained PyTorch LSTM forecasts, forecast intervals, and independent `view` buttons. Selecting **Best** compares the models on a chronological holdout and forecasts with the lowest-MAE model. The same model backend is used by both dashboards.
 
 ### R Shiny
 
-The R implementation follows the original Shiny layout and behavior:
+The R implementation provides the same forecasts and call-taker staffing analysis through the shared Python model backend:
 
 ```bash
 Rscript src/app.R
 ```
 
-Open `http://127.0.0.1:5170`. The R app uses Shiny, Plotly, Forecast, Zoo, and Reticulate. Reticulate calls the Python environment's DuckDB package to aggregate the Parquet lake. Set `NYC311_PYTHON` if the Python executable is not `.venv/bin/python`.
+Open `http://127.0.0.1:5170`. The R app uses Shiny, Plotly, Arrow, and Reticulate. Set `NYC311_PYTHON` if the Python executable is not `.venv/bin/python`; the Python environment must install `requirements.txt`.
 
 For either application, set `NYC311_DATA_ROOT` when the data lake is outside the repository. The current local lake contains data from `2020-01-01` through `2026-08-25`.
+
+### Forecast tracking and model selection
+
+The Python dependencies in `requirements.txt` include MLflow, PyTorch, and pmdarima. Each forecast request evaluates the selected model (or all three candidates) on the most recent chronological holdout, records MAE/RMSE and model metadata in the `nyc311-call-volume` MLflow experiment, and tags the selected best run. The default MLflow SQLite store is `~/.nyc311_pipeline/mlflow.db`, with artifacts in `~/.nyc311_pipeline/artifacts`; set `MLFLOW_TRACKING_URI` and optionally `MLFLOW_EXPERIMENT_NAME` to use a shared tracking server or another store. `MLFLOW_ARTIFACT_URI` can override the artifact destination for a new local experiment. Inspect the default store with `mlflow ui --backend-store-uri sqlite:///$HOME/.nyc311_pipeline/mlflow.db`.
+
+### Call-taker workforce optimization
+
+Both dashboards include a staffing scenario based on forecasted opened requests, converted to calls using an editable calls-per-request factor. Erlang-C estimates the minimum scheduled call-taker headcount meeting the chosen service-level target and occupancy ceiling; user-editable planning inputs include handle time, business hours/days, wage, and shrinkage. Monthly forecast-driven labor cost is compared with holding peak-horizon staffing fixed, with projected savings shown beside the cost chart. Initial defaults (one call per request, 8-minute handle time, 80% answered in 20 seconds, 85% occupancy, 30% shrinkage, 22 workdays, and $25/hour) are illustrative assumptions, not measured agency staffing data. Validate them against call-center telemetry, intraday arrival patterns, contracts, and scheduling rules before operational use.
 
 ### Research / Prototype Project
 
@@ -325,8 +333,9 @@ Develop an interactive forecasting portal using R.
 
 - Daily opened and closed request history.
 - Borough filtering.
-- Monthly Holt-Winters and ARIMA forecasts.
-- LSTM-style seasonal forecast with a residual-based 95% confidence interval.
+- Monthly Holt-Winters, automatic ARIMA/SARIMA, and trained LSTM forecasts.
+- Holdout-based best-model selection and MLflow run tracking.
+- Erlang-C call-taker staffing estimates with adjustable assumptions and labor-cost comparisons.
 - Plotly visualization with R-style two-panel controls.
 
 ### Technology
@@ -334,9 +343,8 @@ Develop an interactive forecasting portal using R.
 - R
 - Shiny
 - Plotly
-- Forecast
-- Zoo
-- Reticulate
+- Arrow
+- Reticulate and Python forecasting runtime
 
 ---
 
@@ -350,8 +358,9 @@ Provide a Python-based analytics interface.
 
 - Daily opened and closed request history.
 - Borough filtering.
-- Monthly Holt-Winters, ARIMA, and LSTM-style forecasts.
-- Forecast confidence bands.
+- Monthly Holt-Winters, automatic ARIMA/SARIMA, and trained LSTM forecasts.
+- Approximate forecast ranges and MLflow-tracked model selection.
+- Erlang-C staffing recommendations and labor-cost savings scenarios.
 - DuckDB-backed aggregation of the curated Parquet lake.
 
 ### Technology
