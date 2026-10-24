@@ -223,7 +223,14 @@ server <- function(input, output, session) {
   output$staffing_plot <- renderPlotly({
     result <- staffing_result()
     staffing <- result$staffing
-    last_month <- as.Date(format(time(result$history)[length(result$history)], "%Y-%m-01"))
+    first_month <- as.Date(sprintf(
+      "%04d-%02d-01",
+      start(result$history)[1],
+      start(result$history)[2]
+    ))
+    last_month <- seq(first_month, by = "month", length.out = length(result$history))[
+      length(result$history)
+    ]
     months <- seq(last_month, by = "month", length.out = nrow(staffing) + 1)[-1]
     plot_ly() %>%
       add_bars(x = months, y = staffing$fixed_monthly_cost, name = "Fixed peak staffing baseline", marker = list(color = "#9ca3af")) %>%
