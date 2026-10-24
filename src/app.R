@@ -4,7 +4,6 @@
 
 library(shiny)
 library(plotly)
-library(arrow)
 library(reticulate)
 
 options(shiny.port = as.integer(Sys.getenv("SHINY_PORT", unset = "3838")))
@@ -31,19 +30,6 @@ dashboard_file <- file.path(
   "dashboard_data.parquet"
 )
 
-if (!file.exists(dashboard_file)) {
-  stop(
-    "Dashboard data not found at: ",
-    dashboard_file
-  )
-}
-
-data <- arrow::read_parquet(dashboard_file)
-
-data$date <- as.Date(data$date)
-
-data$borough <- toupper(trimws(data$borough))
-
 python_executable <- Sys.getenv(
   "NYC311_PYTHON",
   unset = Sys.getenv(
@@ -60,6 +46,17 @@ if (!nzchar(python_executable)) {
 reticulate::use_python(python_executable, required = TRUE)
 reticulate::source_python(file.path(app_dir, "forecasting.py"))
 reticulate::source_python(file.path(app_dir, "workforce.py"))
+
+if (!file.exists(dashboard_file)) {
+  stop(
+    "Dashboard data not found at: ",
+    dashboard_file
+  )
+}
+
+data <- reticulate::import("pandas")$read_parquet(dashboard_file)
+data$date <- as.Date(data$date)
+data$borough <- toupper(trimws(data$borough))
 
 boroughs <- c(
   "ALL",

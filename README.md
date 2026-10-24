@@ -23,7 +23,7 @@ The R implementation provides the same forecasts and call-taker staffing analysi
 Rscript src/app.R
 ```
 
-Open `http://127.0.0.1:5170`. The R app uses Shiny, Plotly, Arrow, and Reticulate. Set `NYC311_PYTHON` if the Python executable is not `.venv/bin/python`; the Python environment must install `requirements.txt`.
+Open `http://127.0.0.1:3838`. The R app uses Shiny, Plotly, and Reticulate; it uses the configured Python environment's pandas/PyArrow to read Parquet and shares the Python forecasting backend. Set `NYC311_PYTHON` if the Python executable is not `.venv/bin/python`; the Python environment must install `requirements.txt`.
 
 For either application, set `NYC311_DATA_ROOT` when the data lake is outside the repository. The current local lake contains data from `2020-01-01` through `2026-08-25`.
 
