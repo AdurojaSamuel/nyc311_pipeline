@@ -25,6 +25,7 @@ class ForecastResult:
 
 
 def _fit_forecast(model_name: str, values: np.ndarray, horizon: int) -> np.ndarray:
+    horizon = int(horizon)
     if len(values) < 18:
         raise ValueError("At least 18 monthly observations are required to fit these models.")
 
@@ -146,6 +147,7 @@ def train_forecast(
     """Compare candidates on a chronological holdout, fit the chosen model, and log runs."""
     values = np.asarray(history, dtype=float).reshape(-1)
     values = values[np.isfinite(values)]
+    horizon = int(horizon)
     if horizon < 1:
         raise ValueError("Forecast horizon must be at least one month.")
     if len(values) < 24:

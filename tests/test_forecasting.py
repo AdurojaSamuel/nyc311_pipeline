@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from mlflow.tracking import MlflowClient
 
-from forecasting import MODEL_NAMES, train_forecast
+from forecasting import MODEL_NAMES, _fit_forecast, train_forecast
 
 
 def test_best_forecast_trains_candidates_and_logs_best_run(monkeypatch, tmp_path):
@@ -32,3 +32,15 @@ def test_best_forecast_trains_candidates_and_logs_best_run(monkeypatch, tmp_path
 def test_forecast_rejects_short_history():
     with pytest.raises(ValueError, match="24 monthly observations"):
         train_forecast(np.arange(12, dtype=float), 3)
+
+
+def test_autoarima_converts_numpy_integer_horizon(monkeypatch):
+    class FakeAutoARIMA:
+        def predict(self, n_periods):
+            assert type(n_periods) is int
+            return np.ones(n_periods)
+
+    monkeypatch.setattr("pmdarima.auto_arima", lambda *args, **kwargs: FakeAutoARIMA())
+    result = _fit_forecast("AutoARIMA", np.arange(24, dtype=float), np.int64(3))
+
+    assert result.tolist() == [1.0, 1.0, 1.0]
