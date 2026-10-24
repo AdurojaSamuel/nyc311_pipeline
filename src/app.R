@@ -51,6 +51,7 @@ if (!nzchar(python_executable)) {
 reticulate::use_python(python_executable, required = TRUE)
 reticulate::source_python(file.path(app_dir, "forecasting.py"))
 reticulate::source_python(file.path(app_dir, "workforce.py"))
+reticulate::source_python(file.path(app_dir, "nyc311_data.py"))
 
 if (!file.exists(dashboard_file)) {
   stop(
@@ -60,8 +61,10 @@ if (!file.exists(dashboard_file)) {
 }
 
 data <- reticulate::import("pandas")$read_parquet(dashboard_file)
+data <- refresh_dashboard_frame(data)
 data$date <- as.Date(data$date)
 data$borough <- toupper(trimws(data$borough))
+data_updated <- max(data$date)
 
 boroughs <- c(
   "ALL",
@@ -143,7 +146,7 @@ ui <- fluidPage(
     column(8, plotlyOutput("staffing_plot", height = "48vh"), textOutput("staffing_summary"))
   ),
   tags$footer(class = "footnote",
-    span("Data Source: NYC Open Data 311 Service Requests "),
+    span(paste0("Data Source: NYC Open Data 311 Service Requests; current through ", data_updated, " ")),
     span(class = "copyright", "(c) Samuel Aduroja")
   )
 )

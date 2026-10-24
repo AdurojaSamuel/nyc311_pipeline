@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html
 
 from forecasting import train_forecast
+from nyc311_data import refresh_dashboard_data
 from workforce import optimize_staffing
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,8 @@ def load_data() -> pd.DataFrame:
         frame = pd.read_parquet(dashboard_file)
 
         frame["date"] = pd.to_datetime(frame["date"])
+        frame, source_updated = refresh_dashboard_data(frame)
+        print(f"NYC Open Data refreshed through: {source_updated}")
 
         return (
             frame
@@ -115,6 +118,8 @@ def load_data() -> pd.DataFrame:
         ).df()
 
     frame["date"] = pd.to_datetime(frame["date"])
+    frame, source_updated = refresh_dashboard_data(frame)
+    print(f"NYC Open Data refreshed through: {source_updated}")
 
     return (
         frame
@@ -272,7 +277,7 @@ app.layout = html.Div([
         ], style={"width": "70%", "boxSizing": "border-box"}),
     ], style={"display": "flex", "alignItems": "flex-start", "gap": "12px", "margin": "0 1.5% 24px"}),
     html.Footer([
-        html.Span("Source: NYC Open Data 311 Service Requests "),
+        html.Span(f"Source: NYC Open Data 311 Service Requests; current through {MAX_DATE} "),
         html.Small("(c) Samuel Aduroja", style={"position": "absolute", "left": "50%", "transform": "translateX(-50%)", "fontWeight": "700", "color": "#1f3a5f"}),
     ], style={"position": "relative", "margin": "0", "padding": "0 1.5%", "boxSizing": "border-box", "color": "#666", "fontSize": "12px", "textAlign": "left", "height": "5vh", "lineHeight": "5vh"}),
 ], style={"fontFamily": "Arial, sans-serif", "color": "#333", "backgroundColor": "white", "minHeight": "100vh", "overflowY": "auto"})

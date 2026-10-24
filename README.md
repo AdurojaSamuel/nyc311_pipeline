@@ -2,7 +2,7 @@
 
 ## Applications
 
-The repository currently provides two interactive applications. Both read the curated Parquet lake and aggregate requests before plotting, so they do not load the full raw dataset into application memory.
+The repository currently provides three interactive applications. The monthly dashboards read the curated Parquet lake and aggregate requests before plotting, while the hourly workforce app queries source-level aggregates; none load the full raw dataset into application memory.
 
 ### Python Dash
 
@@ -25,7 +25,21 @@ Rscript src/app.R
 
 Open `http://127.0.0.1:3838`. The R app uses Shiny, Plotly, and Reticulate; it uses the configured Python environment's pandas/PyArrow to read Parquet and shares the Python forecasting backend. Set `NYC311_PYTHON` if the Python executable is not `.venv/bin/python`; the Python environment must install `requirements.txt`.
 
-For either application, set `NYC311_DATA_ROOT` when the data lake is outside the repository. The current local lake contains data from `2020-01-01` through `2026-08-25`.
+For either monthly application, set `NYC311_DATA_ROOT` when the data lake is outside the repository. The checked-in daily cache contains data from `2020-01-01` through `2026-10-23`; both monthly apps also refresh their recent window from NYC Open Data when they start.
+
+Both existing dashboards refresh their recent opened/closed daily aggregates from NYC Open Data at startup and display the latest request date used by their forecasts. The checked-in Parquet file remains a local cache; network refresh errors are reported rather than silently represented as current live data.
+
+### Hourly workforce optimization dashboard
+
+Run the separate interactive hourly scenario app:
+
+```bash
+.venv/bin/python src/workforce_app.py
+```
+
+Open `http://127.0.0.1:8051`. The app fetches current NYC 311 creation timestamps aggregated by date/hour/borough from the public NYC Open Data endpoint. A recent same-weekday hourly baseline is evaluated with rolling-origin validation, then scaled by the editable calls-per-request assumption. This dataset contains service requests, not ACD call arrivals, agent timecards, or labor costs; the call conversion and staffing controls are scenario inputs and must be calibrated against real call-center data.
+
+The allocation engine uses SciPy's HiGHS mixed-integer linear programming solver. It first minimizes same-hour unserved calls under the daily shift budget, then minimizes complete-shift labor cost without worsening that service result. The model includes one shift per agent, shift eligibility, half-hour midpoint break capacity, handle-time/occupancy-based hourly capacity, per-shift maximum/optional minimum workloads, and the daily budget. An optional CSV roster can supply per-agent eligible shifts and rates. See the dashboard notes for limitations around live queues, skills, contracts, and production scheduling.
 
 ### Forecast tracking and model selection
 
